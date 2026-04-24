@@ -1,0 +1,1084 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Finanzas Familia V&amp;V · Dashboard</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg:      #0b1929;
+      --s1:      #112338;
+      --s2:      #172e4a;
+      --s3:      #1e3860;
+      --accent:  #2563eb;
+      --accent2: #60a5fa;
+      --green:   #10b981;
+      --yellow:  #f59e0b;
+      --red:     #ef4444;
+      --purple:  #8b5cf6;
+      --text:    #e8f4ff;
+      --muted:   #7fa0c4;
+      --border:  #1d3555;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    /* ── CONFIG SCREEN ─────────────────────────────────── */
+    #cfg {
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100vh; padding: 2rem;
+    }
+    .cfg-card {
+      background: var(--s1); border: 1px solid var(--border);
+      border-radius: 18px; padding: 3rem 2.5rem; max-width: 520px; width: 100%; text-align: center;
+    }
+    .cfg-card .emoji { font-size: 3.5rem; margin-bottom: 1rem; }
+    .cfg-card h1 { font-size: 1.7rem; font-weight: 700; margin-bottom: .4rem; }
+    .cfg-card .sub { color: var(--muted); font-size: .9rem; margin-bottom: 2rem; }
+    .cfg-card label { display: block; text-align: left; font-size: .8rem; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: .5rem; }
+    .cfg-card input {
+      width: 100%; padding: .75rem 1rem; background: var(--s2); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text); font-size: .9rem; margin-bottom: 1.5rem; font-family: monospace;
+    }
+    .cfg-card input:focus { outline: none; border-color: var(--accent2); }
+    .btn-primary {
+      width: 100%; padding: .8rem; background: var(--accent); color: #fff; border: none;
+      border-radius: 9px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: opacity .2s;
+    }
+    .btn-primary:hover { opacity: .85; }
+    .cfg-help {
+      margin-top: 1.5rem; font-size: .78rem; color: var(--muted);
+      text-align: left; line-height: 1.7; background: var(--s2); border-radius: 8px; padding: 1rem;
+    }
+    .cfg-help code { color: var(--accent2); }
+    .cfg-help a { color: var(--accent2); cursor: pointer; text-decoration: underline; }
+
+    /* ── APP ───────────────────────────────────────────── */
+    #app { display: none; }
+
+    header {
+      background: linear-gradient(135deg, #08172a 0%, #0f2847 60%, #152e50 100%);
+      border-bottom: 1px solid var(--border);
+      padding: .7rem 1.5rem;
+      display: flex; align-items: center; gap: 1rem;
+      position: sticky; top: 0; z-index: 100;
+    }
+    .hdr-title { flex: 1; }
+    .hdr-title h1 { font-size: 1.1rem; font-weight: 700; }
+    .hdr-title p { font-size: .72rem; color: var(--muted); margin-top: .1rem; }
+    .hdr-actions { display: flex; gap: .5rem; }
+    .btn-sm {
+      padding: .35rem .9rem; background: var(--s2); border: 1px solid var(--border);
+      color: var(--text); border-radius: 7px; font-size: .78rem; font-weight: 500; cursor: pointer; transition: background .2s;
+    }
+    .btn-sm:hover { background: var(--s3); }
+
+    .nav-bar {
+      background: var(--s1); border-bottom: 1px solid var(--border);
+      padding: .6rem 1.5rem; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+    }
+    .tabs { display: flex; gap: .25rem; }
+    .tab {
+      padding: .42rem 1.1rem; border-radius: 7px; font-size: .84rem; font-weight: 500;
+      cursor: pointer; border: 1px solid transparent; background: transparent; color: var(--muted); transition: all .2s;
+    }
+    .tab.active { background: var(--accent); color: #fff; }
+    .tab:not(.active):hover { background: var(--s2); color: var(--text); }
+    .period-sel { margin-left: auto; display: flex; gap: .5rem; align-items: center; }
+    .period-sel select {
+      padding: .38rem .75rem; background: var(--s2); border: 1px solid var(--border);
+      border-radius: 7px; color: var(--text); font-size: .83rem; cursor: pointer;
+    }
+
+    /* ── LOADING ───────────────────────────────────────── */
+    #loading {
+      display: none; flex-direction: column; align-items: center; justify-content: center;
+      min-height: 65vh; gap: 1rem;
+    }
+    .spinner {
+      width: 38px; height: 38px; border: 3px solid var(--border);
+      border-top-color: var(--accent); border-radius: 50%; animation: spin .9s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── MAIN ──────────────────────────────────────────── */
+    main { padding: 1.25rem 1.5rem; max-width: 1440px; margin: 0 auto; }
+
+    .err-banner {
+      background: rgba(239,68,68,.12); border: 1px solid rgba(239,68,68,.3);
+      border-radius: 8px; padding: .85rem 1.1rem; margin-bottom: 1rem;
+      color: #fca5a5; font-size: .84rem;
+    }
+
+    /* ── HEALTH ROW ────────────────────────────────────── */
+    .health-row { display: grid; grid-template-columns: 240px 1fr; gap: 1.1rem; margin-bottom: 1.1rem; }
+    .health-card {
+      background: var(--s1); border: 1px solid var(--border); border-radius: 13px;
+      padding: 1.25rem; text-align: center;
+    }
+    .health-card h3 { font-size: .72rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: .6rem; }
+    .health-num { font-size: 3rem; font-weight: 800; line-height: 1; }
+    .health-denom { font-size: .8rem; color: var(--muted); margin-top: .15rem; }
+    .health-badge {
+      display: inline-block; padding: .28rem .85rem; border-radius: 20px;
+      font-size: .78rem; font-weight: 600; margin-top: .6rem;
+    }
+    .b-green { background: rgba(16,185,129,.15); color: var(--green); }
+    .b-yellow { background: rgba(245,158,11,.15); color: var(--yellow); }
+    .b-red { background: rgba(239,68,68,.15); color: var(--red); }
+
+    /* ── KPI CARDS ─────────────────────────────────────── */
+    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: .9rem; }
+    .kpi {
+      background: var(--s1); border: 1px solid var(--border); border-radius: 12px;
+      padding: 1rem 1.1rem; border-left: 3px solid transparent;
+    }
+    .kpi.g { border-left-color: var(--green); }
+    .kpi.y { border-left-color: var(--yellow); }
+    .kpi.r { border-left-color: var(--red); }
+    .kpi.p { border-left-color: var(--purple); }
+    .kpi-lbl { font-size: .7rem; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: .45rem; }
+    .kpi-val { font-size: 1.45rem; font-weight: 700; line-height: 1.1; }
+    .kpi-sub { font-size: .71rem; color: var(--muted); margin-top: .3rem; line-height: 1.4; }
+
+    /* ── CHARTS ────────────────────────────────────────── */
+    .chart-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 1.1rem; margin: 1.1rem 0; }
+    .chart-card {
+      background: var(--s1); border: 1px solid var(--border); border-radius: 13px; padding: 1.25rem;
+    }
+    .chart-title { font-size: .75rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 1rem; }
+    .chart-wrap { position: relative; }
+
+    /* ── AGENDA ────────────────────────────────────────── */
+    .agenda {
+      background: var(--s1); border: 1px solid var(--border); border-radius: 13px;
+      padding: 1.5rem 1.75rem; margin-top: 1.1rem;
+    }
+    .agenda-hdr { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; flex-wrap: wrap; gap: .5rem; }
+    .agenda-hdr h2 { font-size: 1.05rem; font-weight: 700; }
+    .agenda-hdr .agenda-date { font-size: .75rem; color: var(--muted); }
+    .agenda-items { display: flex; flex-direction: column; gap: 1.1rem; }
+    .ai {
+      border-left: 3px solid var(--border); padding-left: 1rem;
+    }
+    .ai-num { font-size: .7rem; color: var(--accent2); font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+    .ai-title { font-size: .95rem; font-weight: 600; margin: .2rem 0 .5rem; }
+    .ai-pts { list-style: none; display: flex; flex-direction: column; gap: .22rem; }
+    .ai-pts li { font-size: .82rem; color: var(--muted); display: flex; gap: .55rem; align-items: flex-start; }
+    .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent2); margin-top: .32rem; flex-shrink: 0; }
+    .dot.g { background: var(--green); }
+    .dot.y { background: var(--yellow); }
+    .dot.r { background: var(--red); }
+    .ai-pts li.good { color: var(--text); }
+    .ai-pts li.warn { color: #fde68a; }
+    .ai-pts li.bad  { color: #fca5a5; }
+
+    .decisions {
+      margin-top: 1.5rem; background: var(--s2); border-radius: 9px; padding: 1.1rem 1.25rem;
+    }
+    .decisions h4 { font-size: .8rem; font-weight: 700; color: var(--accent2); margin-bottom: .85rem; text-transform: uppercase; letter-spacing: .04em; }
+    .dec-line { display: flex; align-items: center; gap: .75rem; padding: .45rem 0; border-bottom: 1px solid var(--border); }
+    .dec-line:last-child { border-bottom: none; }
+    .dec-box { width: 17px; height: 17px; border: 2px solid var(--muted); border-radius: 4px; flex-shrink: 0; }
+    .dec-txt { font-size: .82rem; color: var(--muted); }
+
+    .section-title { font-size: .75rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin: 1.25rem 0 .75rem; }
+
+    /* ── PRINT ─────────────────────────────────────────── */
+    @media print {
+      header .hdr-actions, .nav-bar, #cfg { display: none !important; }
+      body { background: #fff; color: #111; }
+      .s1, .health-card, .kpi, .chart-card, .agenda { background: #fff; border-color: #ccc; }
+      .agenda { page-break-before: always; }
+      .health-num, .kpi-val { color: #111 !important; }
+      .muted, .kpi-sub, .ai-pts li, .agenda-date, .chart-title { color: #555 !important; }
+    }
+
+    @media (max-width: 700px) {
+      .health-row { grid-template-columns: 1fr; }
+      main { padding: 1rem; }
+      .nav-bar { padding: .6rem 1rem; }
+      header { padding: .6rem 1rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══ CONFIG SCREEN ══════════════════════════════════════════ -->
+<div id="cfg">
+  <div class="cfg-card">
+    <div class="emoji">💰</div>
+    <h1>Finanzas Familia V&amp;V</h1>
+    <p class="sub">Dashboard de salud financiera &amp; comité familiar</p>
+    <label>ID de tu Google Spreadsheet</label>
+    <input id="sid" type="text" placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms" />
+    <button class="btn-primary" onclick="connect()">Conectar y cargar datos →</button>
+    <div class="cfg-help">
+      <strong>Cómo obtener el ID:</strong><br>
+      Abre tu Google Sheet → copia el ID de la URL:<br>
+      <code>spreadsheets/d/<strong style="color:#f0f6ff">TU_ID_AQUI</strong>/edit</code><br><br>
+      El Sheet debe estar compartido como <strong>"Cualquiera con el enlace puede ver"</strong>
+      (Compartir → Acceso general → Cualquier persona).<br><br>
+      <a onclick="useSampleData()">→ Usar datos de muestra para explorar el dashboard</a>
+    </div>
+  </div>
+</div>
+
+<!-- ══ APP ════════════════════════════════════════════════════ -->
+<div id="app">
+  <header>
+    <span style="font-size:1.5rem">💰</span>
+    <div class="hdr-title">
+      <h1>Finanzas Familia V&amp;V</h1>
+      <p id="last-upd">Cargando...</p>
+    </div>
+    <div class="hdr-actions">
+      <button class="btn-sm" onclick="refreshData()">↺ Actualizar</button>
+      <button class="btn-sm" onclick="window.print()">🖨 Imprimir</button>
+      <button class="btn-sm" onclick="goConfig()">⚙ Config</button>
+    </div>
+  </header>
+
+  <div class="nav-bar">
+    <div class="tabs">
+      <button class="tab active" data-view="mensual"   onclick="setView(this)">📅 Mensual</button>
+      <button class="tab"        data-view="semestral" onclick="setView(this)">📊 Semestral</button>
+      <button class="tab"        data-view="anual"     onclick="setView(this)">📈 Anual</button>
+    </div>
+    <div class="period-sel">
+      <select id="sel-month" onchange="render()"></select>
+      <select id="sel-year"  onchange="render()"></select>
+    </div>
+  </div>
+
+  <div id="loading"><div class="spinner"></div><p style="color:var(--muted)">Cargando datos de Google Sheets…</p></div>
+  <main id="main" style="display:none"></main>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════════════════
+   CONSTANTS & STATE
+══════════════════════════════════════════════════════════════ */
+const SHEETS = {
+  FLUJO:     'Flujo_Caja_Mes',
+  GASTOS:    'Gastos_Mes_Apilado',
+  INGRESOS:  'Ingresos_Mes_Apilado',
+  AHORROS:   'Ahorros_Mes_Apilado',
+  INVERSIONES:'Inversion_Mes_Apilado',
+};
+
+let SID = '';
+let RAW = {};
+let PROC = {};       // { 'YYYY-MM': { flujo, gastos, ingresos, ahorros, inversiones } }
+let VIEW = 'mensual';
+let CHARTS = {};
+
+/* ══════════════════════════════════════════════════════════════
+   UTILS
+══════════════════════════════════════════════════════════════ */
+const MES_NAMES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+const MES_FULL  = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+function fmt(n, dec = 0) {
+  if (n == null || isNaN(n)) return '—';
+  return Math.abs(n).toLocaleString('es-CO', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+}
+function cop(n) { return n == null || isNaN(n) ? '—' : (n < 0 ? '-' : '') + '$' + fmt(n); }
+function pct(n, dec = 1) { return n == null || isNaN(n) ? '—' : n.toFixed(dec) + '%'; }
+function num(s) { if (s == null || s === '') return 0; return parseFloat(String(s).replace(/[^0-9.\-]/g, '')) || 0; }
+
+function parseDate(s) {
+  if (!s) return null;
+  s = String(s).trim();
+  // ISO format: 2025-01-31
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+  // Slash format: 1/31/2025 or 31/1/2025
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (m) {
+    const a = +m[1], b = +m[2], y = +m[3];
+    // If first part > 12 it must be day (DD/MM/YYYY)
+    return a > 12 ? new Date(y, b - 1, a) : new Date(y, a - 1, b);
+  }
+  const d = new Date(s);
+  return isNaN(d) ? null : d;
+}
+
+function toYM(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+function ymLabel(ym) {
+  const [y, m] = ym.split('-');
+  return `${MES_NAMES[+m - 1]} ${y}`;
+}
+function ymFull(ym) {
+  const [y, m] = ym.split('-');
+  return `${MES_FULL[+m - 1]} ${y}`;
+}
+
+function color(status) {
+  return { green: 'var(--green)', yellow: 'var(--yellow)', red: 'var(--red)', purple: 'var(--purple)' }[status] || 'var(--muted)';
+}
+function status3(val, gFn, yFn) {
+  if (gFn(val)) return 'green'; if (yFn(val)) return 'yellow'; return 'red';
+}
+function killChart(k) { if (CHARTS[k]) { CHARTS[k].destroy(); delete CHARTS[k]; } }
+
+/* ══════════════════════════════════════════════════════════════
+   DATA FETCHING
+══════════════════════════════════════════════════════════════ */
+function sheetURL(name) {
+  return `https://docs.google.com/spreadsheets/d/${SID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(name)}`;
+}
+
+async function fetchSheet(name) {
+  return new Promise((res, rej) => {
+    Papa.parse(sheetURL(name), {
+      download: true, header: true, skipEmptyLines: true,
+      complete: r => res(r.data),
+      error: e => rej(e),
+    });
+  });
+}
+
+async function loadData() {
+  const jobs = await Promise.allSettled(
+    Object.entries(SHEETS).map(async ([k, n]) => [k, await fetchSheet(n)])
+  );
+  RAW = {};
+  for (const j of jobs) {
+    if (j.status === 'fulfilled') {
+      const [k, rows] = j.value;
+      RAW[k] = rows;
+    }
+  }
+  processData();
+}
+
+/* ══════════════════════════════════════════════════════════════
+   DATA PROCESSING
+══════════════════════════════════════════════════════════════ */
+function ensureYM(ym) {
+  if (!PROC[ym]) PROC[ym] = { flujo: null, gastos: { real: {}, presup: {} }, ingresos: { real: 0, presup: 0 }, ahorros: { real: 0, presup: 0 }, inversiones: { total: 0, rendimiento: 0, aporte: 0, saldo: 0 } };
+  return PROC[ym];
+}
+
+function processData() {
+  PROC = {};
+
+  // Flujo de caja
+  for (const row of (RAW.FLUJO || [])) {
+    const d = parseDate(row['Mes']); if (!d) continue;
+    const ym = toYM(d);
+    ensureYM(ym).flujo = {
+      ingresos:  num(row['Ingresos']),
+      gastosFijos: num(row['Gastos_Fijos']),
+      gastosVar:   num(row['Gastos_Variables']),
+      flujo:       num(row['Flujo_Caja']),
+      acumulado:   num(row['Flujo_Acumulado']),
+    };
+  }
+
+  // Gastos
+  for (const row of (RAW.GASTOS || [])) {
+    const d = parseDate(row['Mes']); if (!d) continue;
+    const ym = toYM(d);
+    const p = ensureYM(ym);
+    const tipo = row['Tipo'], cat = row['Categoria'], monto = num(row['Monto']);
+    if (!cat) continue;
+    if (tipo === 'Real')        p.gastos.real[cat]   = (p.gastos.real[cat]  || 0) + monto;
+    else if (tipo === 'Presupuesto') p.gastos.presup[cat] = (p.gastos.presup[cat] || 0) + monto;
+  }
+
+  // Ingresos
+  for (const row of (RAW.INGRESOS || [])) {
+    const d = parseDate(row['Mes']); if (!d) continue;
+    const ym = toYM(d);
+    const p = ensureYM(ym);
+    const tipo = row['Tipo'], monto = num(row['Monto']);
+    if (tipo === 'Real')             p.ingresos.real   += monto;
+    else if (tipo === 'Presupuesto') p.ingresos.presup += monto;
+  }
+
+  // Ahorros
+  for (const row of (RAW.AHORROS || [])) {
+    const d = parseDate(row['Mes']); if (!d) continue;
+    const ym = toYM(d);
+    const p = ensureYM(ym);
+    const tipo = row['Tipo'], monto = num(row['Monto']);
+    if (tipo === 'Real')             p.ahorros.real   += monto;
+    else if (tipo === 'Presupuesto') p.ahorros.presup += monto;
+  }
+
+  // Inversiones
+  for (const row of (RAW.INVERSIONES || [])) {
+    const d = parseDate(row['Mes']); if (!d) continue;
+    const ym = toYM(d);
+    const p = ensureYM(ym);
+    if (row['Tipo'] === 'Real') {
+      p.inversiones.total     += num(row['Total']);
+      p.inversiones.rendimiento += num(row['Rendimiento']);
+      p.inversiones.aporte    += num(row['Aporte']);
+      p.inversiones.saldo     += num(row['Saldo_Inicial']);
+    }
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   KPI ENGINE
+══════════════════════════════════════════════════════════════ */
+function kpisFor(ym) {
+  const p = PROC[ym] || {};
+  const ing    = p.ingresos?.real   || 0;
+  const ingPre = p.ingresos?.presup || 0;
+  const aho    = p.ahorros?.real    || 0;
+  const ahoPre = p.ahorros?.presup  || 0;
+  const gasR   = Object.values(p.gastos?.real  || {}).reduce((a,b)=>a+b,0);
+  const gasPre = Object.values(p.gastos?.presup|| {}).reduce((a,b)=>a+b,0);
+  const rend   = p.inversiones?.rendimiento || 0;
+  const saldo  = p.inversiones?.saldo       || 0;
+  const total  = p.inversiones?.total       || 0;
+  const flujo  = p.flujo?.flujo    || 0;
+  const acum   = p.flujo?.acumulado|| 0;
+
+  const tasaAhorro   = ing > 0 ? aho / ing * 100 : null;
+  const cumplGastos  = gasPre > 0 ? gasR / gasPre * 100 : null;
+  const cumplIng     = ingPre > 0 ? ing / ingPre * 100   : null;
+  const rentInv      = saldo > 0  ? rend / saldo * 100    : null;
+
+  // Health score (0-100)
+  let score = 0, n = 0;
+  if (tasaAhorro  != null) { score += Math.min(100, tasaAhorro / 20 * 100); n++; }
+  if (cumplGastos != null) { score += cumplGastos <= 100 ? 100 : Math.max(0, 200 - cumplGastos); n++; }
+  if (ing > 0) { score += flujo > 0 ? 100 : flujo === 0 ? 50 : 0; n++; }
+  if (rentInv != null) { score += rentInv > 0 ? 100 : 60; n++; }
+  const health = n > 0 ? score / n : 0;
+
+  return {
+    ing, ingPre, aho, ahoPre, gasR, gasPre, rend, saldo, total, flujo, acum,
+    tasaAhorro, cumplGastos, cumplIng, rentInv, health,
+    gasCats:     p.gastos?.real  || {},
+    gasPreCats:  p.gastos?.presup|| {},
+  };
+}
+
+function healthInfo(score) {
+  if (score >= 80) return { cls: 'b-green',  label: '🟢 Finanzas saludables' };
+  if (score >= 60) return { cls: 'b-yellow', label: '🟡 En camino, revisar' };
+  return              { cls: 'b-red',    label: '🔴 Atención requerida' };
+}
+
+/* ══════════════════════════════════════════════════════════════
+   CHART DEFAULTS
+══════════════════════════════════════════════════════════════ */
+function baseOpts(yFmt, legendPos = false) {
+  return {
+    responsive: true,
+    plugins: {
+      legend: legendPos ? { position: legendPos, labels: { color: '#7fa0c4', font: { size: 11 }, boxWidth: 12 } } : { display: false },
+      tooltip: { callbacks: { label: ctx => ' ' + cop(ctx.raw) } },
+    },
+    scales: {
+      x: { ticks: { color: '#7fa0c4', font: { size: 11 } }, grid: { color: 'rgba(255,255,255,.04)' } },
+      y: { ticks: { color: '#7fa0c4', font: { size: 11 }, callback: yFmt }, grid: { color: 'rgba(255,255,255,.06)' } },
+    },
+  };
+}
+function mFmt(v) { return '$' + (Math.abs(v) >= 1e6 ? (v/1e6).toFixed(1)+'M' : (v/1e3).toFixed(0)+'K'); }
+function pFmt(v) { return v.toFixed(1) + '%'; }
+
+/* ══════════════════════════════════════════════════════════════
+   UI HELPERS
+══════════════════════════════════════════════════════════════ */
+function kpi(lbl, val, st, sub='') {
+  return `<div class="kpi ${st[0]}">
+    <div class="kpi-lbl">${lbl}</div>
+    <div class="kpi-val" style="color:${color(st)}">  ${val}</div>
+    ${sub ? `<div class="kpi-sub">${sub}</div>` : ''}
+  </div>`;
+}
+
+function agendaItem(num, title, pts, accent = '') {
+  const border = accent ? `style="border-left-color:${accent}"` : '';
+  return `<div class="ai" ${border}>
+    <div class="ai-num">Punto ${num}</div>
+    <div class="ai-title">${title}</div>
+    <ul class="ai-pts">${pts}</ul>
+  </div>`;
+}
+
+function pt(txt, cls='', dotCls='') {
+  return `<li class="${cls}"><span class="dot ${dotCls}"></span><span>${txt}</span></li>`;
+}
+
+function decisions(items) {
+  return `<div class="decisions">
+    <h4>✏️ Compromisos del Comité</h4>
+    ${items.map(i => `<div class="dec-line"><div class="dec-box"></div><span class="dec-txt">${i}: ________________________</span></div>`).join('')}
+  </div>`;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   RENDER: MENSUAL
+══════════════════════════════════════════════════════════════ */
+function renderMensual() {
+  const ym = selYM();
+  const k  = kpisFor(ym);
+  const hi = healthInfo(k.health);
+  const topCats = Object.entries(k.gasCats).sort((a,b)=>b[1]-a[1]).slice(0, 9);
+  const topLbls = topCats.map(([c])=>c);
+  const topReal  = topCats.map(([c,v])=>v);
+  const topPre   = topLbls.map(c => k.gasPreCats[c]||0);
+  const palette  = ['#2563eb','#10b981','#f59e0b','#8b5cf6','#ef4444','#06b6d4','#f97316','#ec4899','#14b8a6'];
+
+  const stAhorro  = k.tasaAhorro  != null ? status3(k.tasaAhorro,  v=>v>=20, v=>v>=10) : 'yellow';
+  const stGastos  = k.cumplGastos != null ? status3(k.cumplGastos, v=>v<=100,v=>v<=115) : 'yellow';
+  const stFlujo   = k.flujo > 0 ? 'green' : k.flujo < 0 ? 'red' : 'yellow';
+  const stRent    = k.rentInv != null ? (k.rentInv > 0 ? 'green' : 'yellow') : 'yellow';
+  const stIng     = k.cumplIng != null ? status3(k.cumplIng, v=>v>=100, v=>v>=90) : 'yellow';
+
+  document.getElementById('main').innerHTML = `
+    <div class="health-row">
+      <div class="health-card">
+        <h3>Score Salud Financiera</h3>
+        <div class="health-num" style="color:${color(healthInfo(k.health).cls.replace('b-',''))}">${k.health.toFixed(0)}</div>
+        <div class="health-denom">de 100 puntos</div>
+        <div class="health-badge ${hi.cls}">${hi.label}</div>
+        <canvas id="gauge" height="100" style="margin-top:.75rem"></canvas>
+      </div>
+      <div>
+        <div class="kpi-grid">
+          ${kpi('Tasa de Ahorro',    k.tasaAhorro!=null?pct(k.tasaAhorro):'—', stAhorro,  `Meta ≥20% · ahorrado: ${cop(k.aho)}`)}
+          ${kpi('Cumpl. Ppto. Gastos', k.cumplGastos!=null?pct(k.cumplGastos):'—', stGastos, `Real ${cop(k.gasR)} vs Ppto ${cop(k.gasPre)}`)}
+          ${kpi('Flujo de Caja',     cop(k.flujo),   stFlujo,  `Acumulado: ${cop(k.acum)}`)}
+          ${kpi('Rent. Inversiones', k.rentInv!=null?pct(k.rentInv,2):'—', stRent, `+${cop(k.rend)} rendimiento`)}
+          ${kpi('Ingresos',          cop(k.ing),     stIng,    `Ppto: ${cop(k.ingPre)}`)}
+          ${kpi('Portafolio',        cop(k.total),   'purple', `Saldo inicial: ${cop(k.saldo)}`)}
+        </div>
+      </div>
+    </div>
+
+    <div class="chart-row">
+      <div class="chart-card">
+        <div class="chart-title">Gastos por Categoría vs Presupuesto</div>
+        <div class="chart-wrap"><canvas id="c-cats" height="240"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Distribución de Gastos Reales</div>
+        <div class="chart-wrap"><canvas id="c-donut" height="240"></canvas></div>
+      </div>
+    </div>
+
+    ${agendaMensualHTML(ym, k, topCats)}
+  `;
+
+  // Gauge (half donut)
+  const hst = healthInfo(k.health);
+  const gColor = hst.cls === 'b-green' ? '#10b981' : hst.cls === 'b-yellow' ? '#f59e0b' : '#ef4444';
+  killChart('gauge');
+  CHARTS.gauge = new Chart(document.getElementById('gauge'), {
+    type: 'doughnut',
+    data: { datasets: [{ data: [k.health, 100 - k.health], backgroundColor: [gColor, '#1e3860'], borderWidth: 0, circumference: 180, rotation: 270 }] },
+    options: { responsive: true, plugins: { tooltip: { enabled: false }, legend: { display: false } }, cutout: '72%' },
+  });
+
+  // Cats bar
+  if (topCats.length) {
+    killChart('cats');
+    CHARTS.cats = new Chart(document.getElementById('c-cats'), {
+      type: 'bar',
+      data: { labels: topLbls, datasets: [
+        { label: 'Real',        data: topReal, backgroundColor: '#2563eb', borderRadius: 4 },
+        { label: 'Presupuesto', data: topPre,  backgroundColor: 'rgba(245,158,11,.25)', borderColor: '#f59e0b', borderWidth: 1, borderRadius: 4 },
+      ]},
+      options: { ...baseOpts(mFmt, 'top'), scales: { ...baseOpts(mFmt,'top').scales, x: { ...baseOpts(mFmt,'top').scales.x, ticks: { ...baseOpts(mFmt,'top').scales.x.ticks, maxRotation: 35, font:{size:10} } } } },
+    });
+
+    // Donut
+    killChart('donut');
+    CHARTS.donut = new Chart(document.getElementById('c-donut'), {
+      type: 'doughnut',
+      data: { labels: topLbls, datasets: [{ data: topReal, backgroundColor: palette, borderWidth: 0 }] },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { position: 'right', labels: { color: '#7fa0c4', font: { size: 10 }, boxWidth: 11, padding: 8 } },
+          tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${cop(ctx.raw)}` } },
+        },
+      },
+    });
+  }
+}
+
+function agendaMensualHTML(ym, k, topCats) {
+  const alerts = [], wins = [];
+  if (k.cumplGastos > 110) alerts.push(`Gastos un <strong>${pct(k.cumplGastos - 100)}</strong> sobre el presupuesto`);
+  if (k.tasaAhorro != null && k.tasaAhorro < 10) alerts.push(`Tasa de ahorro muy baja: <strong>${pct(k.tasaAhorro)}</strong>`);
+  if (k.flujo < 0) alerts.push(`Flujo de caja negativo: <strong>${cop(k.flujo)}</strong>`);
+  if (k.tasaAhorro >= 20) wins.push(`¡Meta de ahorro cumplida! Tasa: <strong>${pct(k.tasaAhorro)}</strong>`);
+  if (k.cumplGastos != null && k.cumplGastos <= 90) wins.push(`Excelente control: solo <strong>${pct(k.cumplGastos)}</strong> del presupuesto de gastos`);
+  if (k.rend > 0) wins.push(`Inversiones generaron <strong>+${cop(k.rend)}</strong> este mes`);
+  const top3 = topCats.slice(0,3).map(([c,v])=>`${c}: ${cop(v)}`).join(' · ');
+
+  return `<div class="agenda">
+    <div class="agenda-hdr">
+      <h2>📋 Agenda — Comité Mensual · ${ymFull(ym)}</h2>
+      <span class="agenda-date">Generado: ${new Date().toLocaleDateString('es-CO',{day:'numeric',month:'long',year:'numeric'})}</span>
+    </div>
+    <div class="agenda-items">
+      ${agendaItem(1,'Revisión de Ingresos',
+        pt(`Ingresos del mes: <strong>${cop(k.ing)}</strong> de <strong>${cop(k.ingPre)}</strong> presupuestados (${pct(k.cumplIng??0)})`, k.cumplIng>=100?'good':'warn', k.cumplIng>=100?'g':'y') +
+        pt('¿Hubo ingresos extraordinarios o faltantes que comentar?')
+      )}
+      ${agendaItem(2,'Revisión de Gastos',
+        pt(`Gastos reales: <strong>${cop(k.gasR)}</strong> vs presupuesto <strong>${cop(k.gasPre)}</strong> = <strong>${pct(k.cumplGastos??0)}</strong>`, k.cumplGastos<=100?'good':'warn', k.cumplGastos<=100?'g':'y') +
+        (top3 ? pt(`Top 3: ${top3}`) : '') +
+        pt('¿Qué gastos imprevistos ocurrieron este mes?') +
+        pt('¿Qué podemos recortar o eliminar el próximo mes?')
+      )}
+      ${agendaItem(3,'Ahorros e Inversiones',
+        pt(`Ahorro del mes: <strong>${cop(k.aho)}</strong> — tasa <strong>${pct(k.tasaAhorro??0)}</strong> (meta: 20%)`, k.tasaAhorro>=20?'good':k.tasaAhorro>=10?'warn':'bad', k.tasaAhorro>=20?'g':k.tasaAhorro>=10?'y':'r') +
+        pt(`Portafolio total: <strong>${cop(k.total)}</strong> · Rendimiento: <strong>+${cop(k.rend)}</strong>`, 'good','g') +
+        pt('¿Hay que ajustar alguna meta de ahorro?')
+      )}
+      ${agendaItem(4,'Flujo de Caja y Salud General',
+        pt(`Flujo libre del mes: <strong>${cop(k.flujo)}</strong>`, k.flujo>0?'good':'bad', k.flujo>0?'g':'r') +
+        pt(`Flujo acumulado: <strong>${cop(k.acum)}</strong>`) +
+        pt(`Score de salud financiera: <strong>${k.health.toFixed(0)}/100</strong>`)
+      )}
+      ${alerts.length ? agendaItem('⚠️','Puntos de Atención', alerts.map(a=>pt(a,'warn','y')).join(''), 'var(--yellow)') : ''}
+      ${wins.length   ? agendaItem('🎉','Logros del Mes',      wins.map(w=>pt(w,'good','g')).join(''), 'var(--green)') : ''}
+    </div>
+    ${decisions(['Ajuste de presupuesto para el próximo mes','Meta de ahorro acordada','Gasto a eliminar o reducir','Compromiso de la familia'])}
+  </div>`;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   RENDER: SEMESTRAL
+══════════════════════════════════════════════════════════════ */
+function renderSemestral() {
+  const ym     = selYM();
+  const months = last6(ym).filter(m => PROC[m]);
+  const labels = months.map(ymLabel);
+
+  const ing   = months.map(m => PROC[m]?.ingresos?.real || 0);
+  const gas   = months.map(m => Object.values(PROC[m]?.gastos?.real||{}).reduce((a,b)=>a+b,0));
+  const aho   = months.map(m => PROC[m]?.ahorros?.real  || 0);
+  const flu   = months.map(m => PROC[m]?.flujo?.flujo   || 0);
+  const inv   = months.map(m => PROC[m]?.inversiones?.total || 0);
+  const rends = months.map(m => PROC[m]?.inversiones?.rendimiento || 0);
+  const tasas = months.map((m,i) => ing[i] > 0 ? aho[i]/ing[i]*100 : 0);
+
+  const avgTasa   = tasas.reduce((a,b)=>a+b,0) / (tasas.length||1);
+  const totalFlu  = flu.reduce((a,b)=>a+b,0);
+  const totalRend = rends.reduce((a,b)=>a+b,0);
+  const totalAho  = aho.reduce((a,b)=>a+b,0);
+  const lastInv   = inv[inv.length-1] || 0;
+  const firstInv  = inv.find(v=>v>0) || 0;
+  const crecInv   = firstInv > 0 ? (lastInv - firstInv)/firstInv*100 : 0;
+
+  document.getElementById('main').innerHTML = `
+    <div class="kpi-grid" style="margin-bottom:1.1rem">
+      ${kpi('Tasa Ahorro Prom. 6M', pct(avgTasa), status3(avgTasa,v=>v>=20,v=>v>=10), `Total ahorrado: ${cop(totalAho)}`)}
+      ${kpi('Flujo de Caja 6M',     cop(totalFlu), totalFlu>0?'green':'red', `Promedio mensual: ${cop(totalFlu/6)}`)}
+      ${kpi('Rendimiento Inversiones', cop(totalRend), totalRend>0?'green':'yellow', `Crec. portafolio: ${pct(crecInv)}`)}
+      ${kpi('Portafolio Actual',    cop(lastInv),  'purple', `Inicio período: ${cop(firstInv)}`)}
+    </div>
+    <div class="chart-row">
+      <div class="chart-card">
+        <div class="chart-title">Ingresos vs Gastos — 6 meses</div>
+        <div class="chart-wrap"><canvas id="c-inggas" height="240"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Flujo de Caja Mensual</div>
+        <div class="chart-wrap"><canvas id="c-flu" height="240"></canvas></div>
+      </div>
+    </div>
+    <div class="chart-row">
+      <div class="chart-card">
+        <div class="chart-title">Tasa de Ahorro Mensual vs Meta 20%</div>
+        <div class="chart-wrap"><canvas id="c-tasa" height="220"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Evolución Portafolio de Inversiones</div>
+        <div class="chart-wrap"><canvas id="c-inv" height="220"></canvas></div>
+      </div>
+    </div>
+    ${agendaSemestralHTML(months, { ing, gas, aho, flu, tasas, rends, avgTasa, totalFlu, totalAho })}
+  `;
+
+  killChart('inggas');
+  CHARTS.inggas = new Chart(document.getElementById('c-inggas'), {
+    type: 'bar',
+    data: { labels, datasets: [
+      { label: 'Ingresos', data: ing, backgroundColor: 'rgba(16,185,129,.8)', borderRadius: 4 },
+      { label: 'Gastos',   data: gas, backgroundColor: 'rgba(239,68,68,.8)',  borderRadius: 4 },
+    ]},
+    options: baseOpts(mFmt, 'top'),
+  });
+
+  killChart('flu');
+  CHARTS.flu = new Chart(document.getElementById('c-flu'), {
+    type: 'bar',
+    data: { labels, datasets: [{ label: 'Flujo', data: flu, backgroundColor: flu.map(v=>v>=0?'rgba(16,185,129,.75)':'rgba(239,68,68,.75)'), borderRadius: 4 }] },
+    options: baseOpts(mFmt),
+  });
+
+  killChart('tasa');
+  CHARTS.tasa = new Chart(document.getElementById('c-tasa'), {
+    type: 'line',
+    data: { labels, datasets: [
+      { label: 'Tasa Ahorro %', data: tasas, borderColor: '#60a5fa', backgroundColor: 'rgba(96,165,250,.12)', fill: true, tension: 0.4, pointRadius: 4 },
+      { label: 'Meta 20%',     data: Array(labels.length).fill(20), borderColor: '#10b981', borderDash: [5,5], pointRadius: 0, borderWidth: 1.5 },
+    ]},
+    options: { ...baseOpts(pFmt, 'top'), plugins: { ...baseOpts(pFmt,'top').plugins, tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.raw.toFixed(1)}%` } } } },
+  });
+
+  killChart('inv');
+  CHARTS.inv = new Chart(document.getElementById('c-inv'), {
+    type: 'line',
+    data: { labels, datasets: [{ label: 'Portafolio', data: inv, borderColor: '#8b5cf6', backgroundColor: 'rgba(139,92,246,.12)', fill: true, tension: 0.4, pointRadius: 4 }] },
+    options: baseOpts(mFmt),
+  });
+}
+
+function agendaSemestralHTML(months, d) {
+  const mejorMes = months[d.flu.indexOf(Math.max(...d.flu))] || '';
+  const peorMes  = months[d.flu.indexOf(Math.min(...d.flu))] || '';
+  const trendIng = d.ing[d.ing.length-1] > d.ing[0] ? '📈 Ingresos en tendencia al alza' : '📉 Ingresos en tendencia a la baja';
+  const range    = months.length > 0 ? `${ymFull(months[0])} – ${ymFull(months[months.length-1])}` : '';
+
+  return `<div class="agenda">
+    <div class="agenda-hdr">
+      <h2>📊 Agenda — Comité Semestral</h2>
+      <span class="agenda-date">${range}</span>
+    </div>
+    <div class="agenda-items">
+      ${agendaItem(1,'Análisis de Tendencias (6 meses)',
+        pt(trendIng) +
+        pt(`Mejor mes en flujo de caja: <strong>${ymFull(mejorMes)}</strong>`, 'good','g') +
+        pt(`Mes con mayor presión financiera: <strong>${ymFull(peorMes)}</strong>`, 'warn','y') +
+        pt('¿Hay categorías de gasto que han crecido consistentemente?')
+      )}
+      ${agendaItem(2,'Revisión de Metas de Ahorro',
+        pt(`Tasa de ahorro promedio semestral: <strong>${pct(d.avgTasa)}</strong> (meta: 20%)`, d.avgTasa>=20?'good':d.avgTasa>=10?'warn':'bad', d.avgTasa>=20?'g':d.avgTasa>=10?'y':'r') +
+        pt(`Total ahorrado en el semestre: <strong>${cop(d.totalAho)}</strong>`, 'good','g') +
+        pt('¿Las metas de ahorro siguen siendo relevantes y alcanzables?') +
+        pt('¿Hay nuevas metas que agregar (viaje, casa, educación)?')
+      )}
+      ${agendaItem(3,'Revisión del Portafolio de Inversiones',
+        pt('¿El rendimiento está alineado con las expectativas?') +
+        pt('¿Hay que rebalancear alguna posición?') +
+        pt('¿Hay nuevas oportunidades de inversión a evaluar?')
+      )}
+      ${agendaItem(4,'Ajustes al Presupuesto para el Próximo Semestre',
+        pt('¿Qué categorías necesitan más o menos presupuesto?') +
+        pt('¿Hay gastos nuevos que presupuestar?') +
+        pt('¿Cambios de ingreso esperados?')
+      )}
+    </div>
+    ${decisions(['Nuevo presupuesto semestral aprobado','Meta de ahorro para el próximo semestre','Decisión sobre inversiones','Gasto extraordinario proyectado','Otro acuerdo'])}
+  </div>`;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   RENDER: ANUAL
+══════════════════════════════════════════════════════════════ */
+function renderAnual() {
+  const year   = selYear();
+  const months = yearMonths(year);
+  const labels = months.map(ymLabel);
+
+  const ing  = months.map(m => PROC[m]?.ingresos?.real || 0);
+  const gas  = months.map(m => Object.values(PROC[m]?.gastos?.real||{}).reduce((a,b)=>a+b,0));
+  const aho  = months.map(m => PROC[m]?.ahorros?.real  || 0);
+  const flu  = months.map(m => PROC[m]?.flujo?.flujo   || 0);
+  const inv  = months.map(m => PROC[m]?.inversiones?.total || 0);
+
+  const totalIng = ing.reduce((a,b)=>a+b,0);
+  const totalGas = gas.reduce((a,b)=>a+b,0);
+  const totalAho = aho.reduce((a,b)=>a+b,0);
+  const totalFlu = flu.reduce((a,b)=>a+b,0);
+  const avgTasa  = totalIng > 0 ? totalAho/totalIng*100 : 0;
+  const lastInv  = inv[inv.length-1] || 0;
+  const ratio    = totalIng > 0 ? totalGas/totalIng*100 : 0;
+
+  const bestM  = months[flu.indexOf(Math.max(...flu))] || '';
+  const worstM = months[flu.indexOf(Math.min(...flu))] || '';
+
+  // Top cats for the year
+  const catY = {};
+  for (const m of months)
+    for (const [c,v] of Object.entries(PROC[m]?.gastos?.real||{}))
+      catY[c] = (catY[c]||0) + v;
+  const topCats = Object.entries(catY).sort((a,b)=>b[1]-a[1]).slice(0,10);
+
+  document.getElementById('main').innerHTML = `
+    <div class="kpi-grid" style="margin-bottom:1.1rem">
+      ${kpi('Ingresos Totales',     cop(totalIng),  'green',   `Prom. mensual: ${cop(totalIng/12)}`)}
+      ${kpi('Gastos Totales',       cop(totalGas),  totalGas<=totalIng?'green':'red', `Prom. mensual: ${cop(totalGas/12)}`)}
+      ${kpi('Total Ahorrado',       cop(totalAho),  status3(avgTasa,v=>v>=20,v=>v>=10), `Tasa promedio: ${pct(avgTasa)}`)}
+      ${kpi('Flujo Caja Acumulado', cop(totalFlu),  totalFlu>0?'green':'red', `Mejor: ${ymLabel(bestM)}`)}
+      ${kpi('Portafolio Cierre',    cop(lastInv),   'purple',  `${months.length} meses`)}
+      ${kpi('Ratio Gasto/Ingreso',  pct(ratio),     status3(ratio,v=>v<=75,v=>v<=90), 'Objetivo: <75%')}
+    </div>
+    <div class="chart-row">
+      <div class="chart-card" style="grid-column: 1 / -1">
+        <div class="chart-title">Evolución Anual — Ingresos, Gastos y Flujo de Caja</div>
+        <div class="chart-wrap"><canvas id="c-anual" height="170"></canvas></div>
+      </div>
+    </div>
+    <div class="chart-row">
+      <div class="chart-card">
+        <div class="chart-title">Top 10 Categorías de Gasto — Año ${year}</div>
+        <div class="chart-wrap"><canvas id="c-topcats" height="280"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Portafolio de Inversiones — Evolución Anual</div>
+        <div class="chart-wrap"><canvas id="c-anualinv" height="280"></canvas></div>
+      </div>
+    </div>
+    ${agendaAnualHTML(year, { totalIng, totalGas, totalAho, totalFlu, avgTasa, lastInv, ratio, bestM, worstM, months, topCats })}
+  `;
+
+  killChart('anual');
+  CHARTS.anual = new Chart(document.getElementById('c-anual'), {
+    type: 'bar',
+    data: { labels, datasets: [
+      { label: 'Ingresos', data: ing, backgroundColor: 'rgba(16,185,129,.65)', borderRadius: 4 },
+      { label: 'Gastos',   data: gas, backgroundColor: 'rgba(239,68,68,.65)',  borderRadius: 4 },
+      { label: 'Flujo de Caja', data: flu, type: 'line', borderColor: '#60a5fa', backgroundColor: 'transparent', tension: 0.4, pointRadius: 4, borderWidth: 2 },
+    ]},
+    options: baseOpts(mFmt, 'top'),
+  });
+
+  if (topCats.length) {
+    killChart('topcats');
+    CHARTS.topcats = new Chart(document.getElementById('c-topcats'), {
+      type: 'bar',
+      data: { labels: topCats.map(([c])=>c), datasets: [{ data: topCats.map(([,v])=>v), backgroundColor: '#2563eb', borderRadius: 4 }] },
+      options: {
+        indexAxis: 'y', responsive: true,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ' ' + cop(ctx.raw) } } },
+        scales: {
+          x: { ticks: { color: '#7fa0c4', font: {size:10}, callback: mFmt }, grid: { color: 'rgba(255,255,255,.04)' } },
+          y: { ticks: { color: '#7fa0c4', font: {size:10} }, grid: { display: false } },
+        },
+      },
+    });
+  }
+
+  killChart('anualinv');
+  CHARTS.anualinv = new Chart(document.getElementById('c-anualinv'), {
+    type: 'line',
+    data: { labels, datasets: [{ label: 'Portafolio', data: inv, borderColor: '#8b5cf6', backgroundColor: 'rgba(139,92,246,.12)', fill: true, tension: 0.4, pointRadius: 4 }] },
+    options: baseOpts(mFmt),
+  });
+}
+
+function agendaAnualHTML(year, d) {
+  return `<div class="agenda">
+    <div class="agenda-hdr">
+      <h2>📈 Agenda — Comité Anual · Cierre ${year}</h2>
+      <span class="agenda-date">Balance ${year} &amp; Proyección ${+year+1}</span>
+    </div>
+    <div class="agenda-items">
+      ${agendaItem(1,`Balance General ${year}`,
+        pt(`Ingresos totales: <strong>${cop(d.totalIng)}</strong>`, 'good','g') +
+        pt(`Gastos totales: <strong>${cop(d.totalGas)}</strong> = <strong>${pct(d.ratio)}</strong> de los ingresos`, d.ratio<=75?'good':'warn', d.ratio<=75?'g':'y') +
+        pt(`Total ahorrado: <strong>${cop(d.totalAho)}</strong> — Tasa promedio: <strong>${pct(d.avgTasa)}</strong>`, d.avgTasa>=20?'good':'warn', d.avgTasa>=20?'g':'y') +
+        pt(`Flujo neto del año: <strong>${cop(d.totalFlu)}</strong>`, d.totalFlu>0?'good':'bad', d.totalFlu>0?'g':'r') +
+        pt(`Mejor mes: <strong>${ymFull(d.bestM)}</strong> · Mes más difícil: <strong>${ymFull(d.worstM)}</strong>`)
+      )}
+      ${agendaItem(2,'Evaluación de Metas Anuales',
+        pt('¿Cumplimos las metas de ahorro del año?') +
+        pt('¿Alcanzamos las metas de inversión?') +
+        pt('¿Qué metas no logramos y por qué?') +
+        pt(`Portafolio al cierre: <strong>${cop(d.lastInv)}</strong>`, 'good','g')
+      )}
+      ${agendaItem(3,'Lecciones Aprendidas',
+        pt('¿Qué hábitos financieros mejoramos este año?') +
+        pt('¿Cuáles son los gastos que más nos costó controlar?') +
+        pt('¿Qué sorpresas financieras tuvimos (positivas y negativas)?')
+      )}
+      ${agendaItem(4,`Planificación ${+year+1}`,
+        pt('Nuevas metas de ahorro e inversión para el próximo año') +
+        pt('Gastos extraordinarios proyectados (viajes, mejoras del hogar, etc.)') +
+        pt('¿Hay cambios de ingreso esperados?') +
+        pt('Ajuste de presupuestos mensuales basado en el histórico')
+      )}
+    </div>
+    ${decisions([`Meta de ahorro ${+year+1}`,`Meta de inversiones ${+year+1}`,'Presupuesto mensual de gastos aprobado','Vacaciones / gasto mayor proyectado','Otro objetivo estratégico'])}
+  </div>`;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   PERIOD SELECTORS
+══════════════════════════════════════════════════════════════ */
+function populateSelectors() {
+  const yms = Object.keys(PROC).sort();
+  if (!yms.length) return;
+
+  const years  = [...new Set(yms.map(ym => ym.split('-')[0]))];
+  const mths   = [...new Set(yms.map(ym => ym.split('-')[1]))];
+
+  const mSel = document.getElementById('sel-month');
+  const ySel = document.getElementById('sel-year');
+  mSel.innerHTML = mths.map(m => `<option value="${m}">${MES_FULL[+m-1]}</option>`).join('');
+  ySel.innerHTML = years.map(y => `<option value="${y}">${y}</option>`).join('');
+
+  const last = yms[yms.length-1];
+  const [ly, lm] = last.split('-');
+  mSel.value = lm;
+  ySel.value = ly;
+}
+
+function selYM()   { return `${document.getElementById('sel-year').value}-${document.getElementById('sel-month').value}`; }
+function selYear() { return document.getElementById('sel-year').value; }
+
+function last6(ym) {
+  const [y, m] = ym.split('-').map(Number);
+  const out = [];
+  for (let i = 5; i >= 0; i--) {
+    let mm = m - i, yy = y;
+    while (mm <= 0) { mm += 12; yy--; }
+    out.push(`${yy}-${String(mm).padStart(2,'0')}`);
+  }
+  return out;
+}
+
+function yearMonths(year) {
+  return Object.keys(PROC).filter(ym => ym.startsWith(year)).sort();
+}
+
+/* ══════════════════════════════════════════════════════════════
+   VIEW MANAGEMENT
+══════════════════════════════════════════════════════════════ */
+function setView(btn) {
+  VIEW = btn.dataset.view;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('sel-month').style.display = VIEW === 'anual' ? 'none' : '';
+  render();
+}
+
+function render() {
+  Object.keys(CHARTS).forEach(killChart);
+  CHARTS = {};
+  if (VIEW === 'mensual')   renderMensual();
+  else if (VIEW === 'semestral') renderSemestral();
+  else renderAnual();
+}
+
+/* ══════════════════════════════════════════════════════════════
+   SAMPLE DATA
+══════════════════════════════════════════════════════════════ */
+function useSampleData() {
+  const months = ['2025-01','2025-02','2025-03','2025-04','2025-05','2025-06',
+                  '2025-07','2025-08','2025-09','2025-10','2025-11','2025-12',
+                  '2026-01','2026-02','2026-03','2026-04'];
+  const cats = ['Mercado','Restaurante + domicilios','Administración','Servicios','Ropa','Entretenimiento','Transporte','Salud','Educación'];
+  RAW = { FLUJO:[], GASTOS:[], INGRESOS:[], AHORROS:[], INVERSIONES:[] };
+
+  const seed = [
+    {ing:18081072,gF:1373723,gV:5249719,fc:11457630,fa:11457630,aho:4000000,inv:115381422,rend:949497},
+    {ing:17958300,gF:1479877,gV:9735047,fc:6743376, fa:18201006,aho:4000000,inv:116280287,rend:898865},
+    {ing:27926907,gF:1380810,gV:15231756,fc:11314341,fa:29515347,aho:4000000,inv:116543502,rend:263215},
+    {ing:19500000,gF:1400000,gV:8200000, fc:9900000, fa:39415347,aho:4000000,inv:117000000,rend:456498},
+    {ing:19500000,gF:1400000,gV:7800000, fc:10300000,fa:49715347,aho:4000000,inv:117500000,rend:501230},
+    {ing:20100000,gF:1450000,gV:8500000, fc:10150000,fa:59865347,aho:4000000,inv:118100000,rend:605870},
+    {ing:19800000,gF:1430000,gV:9100000, fc:9270000, fa:69135347,aho:4000000,inv:118700000,rend:600000},
+    {ing:20200000,gF:1450000,gV:8600000, fc:10150000,fa:79285347,aho:4000000,inv:119400000,rend:700000},
+    {ing:19500000,gF:1420000,gV:8900000, fc:9180000, fa:88465347,aho:4000000,inv:120100000,rend:700000},
+    {ing:21000000,gF:1480000,gV:9500000, fc:10020000,fa:98485347,aho:4500000,inv:120900000,rend:800000},
+    {ing:20500000,gF:1460000,gV:11200000,fc:7840000, fa:106325347,aho:4000000,inv:121700000,rend:800000},
+    {ing:22000000,gF:1500000,gV:12000000,fc:8500000, fa:114825347,aho:5000000,inv:122600000,rend:900000},
+    {ing:19500000,gF:1400000,gV:8000000, fc:10100000,fa:124925347,aho:4000000,inv:123500000,rend:900000},
+    {ing:19800000,gF:1420000,gV:9100000, fc:9280000, fa:134205347,aho:4000000,inv:124500000,rend:1000000},
+    {ing:20300000,gF:1450000,gV:8700000, fc:10150000,fa:144355347,aho:4000000,inv:125600000,rend:1100000},
+    {ing:19500000,gF:1400000,gV:7900000, fc:10200000,fa:154555347,aho:4000000,inv:126800000,rend:1200000},
+  ];
+
+  const catWeights = [.22,.16,.14,.12,.08,.09,.07,.07,.05];
+  months.forEach((ym, i) => {
+    const d = seed[i] || seed[seed.length-1];
+    const mesDate = ym + '-28';
+    RAW.FLUJO.push({Mes:mesDate, Ingresos:d.ing, Gastos_Fijos:d.gF, Gastos_Variables:d.gV, Flujo_Caja:d.fc, Flujo_Acumulado:d.fa});
+    ['Real','Presupuesto'].forEach(tipo => {
+      RAW.INGRESOS.push({Mes:mesDate, Tipo:tipo, Monto: tipo==='Real'?d.ing:d.ing*1.01});
+      RAW.AHORROS.push({Mes:mesDate,  Tipo:tipo, Monto:4000000});
+    });
+    RAW.INVERSIONES.push({Mes:mesDate, Tipo:'Real', Total:d.inv, Rendimiento:d.rend, Aporte:0, Saldo_Inicial:d.inv-d.rend});
+    cats.forEach((cat, ci) => {
+      const base = (d.gV + d.gF) * catWeights[ci];
+      RAW.GASTOS.push({Mes:mesDate, Tipo:'Real',        Categoria:cat, Monto: base*(0.8+Math.random()*.4)});
+      RAW.GASTOS.push({Mes:mesDate, Tipo:'Presupuesto', Categoria:cat, Monto: base});
+    });
+  });
+
+  processData();
+  document.getElementById('cfg').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('main').style.display = 'block';
+  document.getElementById('last-upd').textContent = '⚡ Datos de muestra · ' + new Date().toLocaleString('es-CO');
+  populateSelectors();
+  render();
+}
+
+/* ══════════════════════════════════════════════════════════════
+   CONNECT & LIFECYCLE
+══════════════════════════════════════════════════════════════ */
+async function connect() {
+  const id = document.getElementById('sid').value.trim();
+  if (!id) { alert('Por favor ingresa el ID del Spreadsheet'); return; }
+  SID = id;
+  try { localStorage.setItem('finanzas_sid', id); } catch(e) {}
+  await startApp();
+}
+
+async function startApp() {
+  document.getElementById('cfg').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('loading').style.display = 'flex';
+  document.getElementById('main').style.display = 'none';
+  try {
+    await loadData();
+    populateSelectors();
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('main').style.display = 'block';
+    document.getElementById('last-upd').textContent = 'Actualizado: ' + new Date().toLocaleString('es-CO');
+    render();
+  } catch(e) {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('main').style.display = 'block';
+    document.getElementById('main').innerHTML = `<div class="err-banner">⚠️ Error al cargar datos. Verifica que el ID sea correcto y el Sheet esté compartido públicamente.<br><small>${e.message || e}</small></div>`;
+  }
+}
+
+async function refreshData() {
+  document.getElementById('last-upd').textContent = 'Actualizando…';
+  await loadData();
+  document.getElementById('last-upd').textContent = 'Actualizado: ' + new Date().toLocaleString('es-CO');
+  render();
+}
+
+function goConfig() {
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('cfg').style.display = 'flex';
+}
+
+/* ══════════════════════════════════════════════════════════════
+   INIT
+══════════════════════════════════════════════════════════════ */
+window.addEventListener('DOMContentLoaded', () => {
+  try {
+    const saved = localStorage.getItem('finanzas_sid');
+    if (saved) document.getElementById('sid').value = saved;
+  } catch(e) {}
+});
+</script>
+</body>
+</html>
