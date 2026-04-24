@@ -1,6 +1,5 @@
 import streamlit as st
 import streamlit.components.v1 as components
-import os
 
 st.set_page_config(
     page_title="Finanzas Familia VV",
@@ -19,6 +18,8 @@ css = (
     "</style>"
 )
 st.markdown(css, unsafe_allow_html=True)
+
+GITHUB_PAGES_URL = "https://diegovalenzuelaca-hub.github.io/finanzas-familia-vv/"
 
 
 def check_password():
@@ -53,11 +54,5 @@ def check_password():
 if not check_password():
     st.stop()
 
-html_file = os.path.join(os.path.dirname(__file__), "index.html")
-
-if os.path.exists(html_file):
-    with open(html_file, "r", encoding="utf-8") as f:
-        html_content = f.read()
-    components.html(html_content, height=1050, scrolling=True)
-else:
-    st.error("No se encontro index.html en el directorio.")
+# Login OK — cargar el dashboard desde GitHub Pages
+components.iframe(GITHUB_PAGES_URL, height=1050, scrolling=True)
