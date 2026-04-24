@@ -1,18 +1,6 @@
 """
 Finanzas Familia V&V — Streamlit App
-=====================================
-Envuelve el dashboard HTML en Streamlit para deployment en streamlit.io
-
-Requisitos:
-    pip install streamlit
-
-Correr localmente:
-    streamlit run streamlit_app.py
-
-Subir a Streamlit Cloud:
-    1. Sube este archivo + index.html al mismo repo de GitHub
-    2. Ve a share.streamlit.io → New app → conecta tu repo
-    3. Main file: streamlit_app.py
+Deployment: share.streamlit.io
 """
 
 import streamlit as st
@@ -26,7 +14,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# Quitar padding por defecto de Streamlit para que el dashboard ocupe todo
+# ── Estilos globales ─────────────────────────────────────────────
 st.markdown("""
 <style>
     .stApp { background: #0b1929; }
@@ -34,17 +22,24 @@ st.markdown("""
     header[data-testid="stHeader"] { display: none; }
     section[data-testid="stSidebar"] { display: none; }
     footer { display: none; }
+    /* Login */
+    .login-wrap {
+        max-width: 380px; margin: 8vh auto 0; padding: 2.5rem 2rem;
+        background: #112338; border: 1px solid #1d3555; border-radius: 16px; text-align: center;
+    }
+    .login-wrap h2 { color: #e8f4ff; margin-bottom: .25rem; }
+    .login-wrap p  { color: #7fa0c4; font-size: .9rem; margin-bottom: 1.5rem; }
 </style>
 """, unsafe_allow_html=True)
 
-# Cargar el HTML del dashboard
-html_file = os.path.join(os.path.dirname(__file__), "index.html")
+# ── Contraseña ───────────────────────────────────────────────────
+def check_password() -> bool:
+    """Devuelve True si el usuario ya está autenticado."""
+    if st.session_state.get("authenticated"):
+        return True
 
-if os.path.exists(html_file):
-    with open(html_file, "r", encoding="utf-8") as f:
-        html_content = f.read()
-    components.html(html_content, height=1000, scrolling=True)
-else:
-    st.error("⚠️ No se encontró `index.html`. "
-             "Asegúrate de que esté en el mismo directorio que este archivo.")
-    st.info("Estructura esperada:\n```\ntu-repo/\n  ├── streamlit_app.py\n  └── index.html\n```")
+    st.markdown("""
+    <div class="login-wrap">
+        <div style="font-size:3rem">💰</div>
+        <h2>Finanzas Familia V&V</h2>
+        <p>Dashboard privado · ingresa la contras

@@ -1073,12 +1073,9 @@ function goConfig() {
 /* ══════════════════════════════════════════════════════════════
    INIT
 ══════════════════════════════════════════════════════════════ */
+// ── ID hardcodeado — se conecta automáticamente al abrir ──
+const DEFAULT_SID = '11I9qygHo_HXBr2BZkyEgVxN8xvb8HE8gD-HMwFZ5Zyo';
+
 window.addEventListener('DOMContentLoaded', () => {
-  try {
-    const saved = localStorage.getItem('finanzas_sid');
-    if (saved) document.getElementById('sid').value = saved;
-  } catch(e) {}
-});
-</script>
-</body>
-</html>
+  if (DEFAULT_SID) {
+    SID 
