@@ -1077,5 +1077,31 @@ function goConfig() {
 const DEFAULT_SID = '11I9qygHo_HXBr2BZkyEgVxN8xvb8HE8gD-HMwFZ5Zyo';
 
 window.addEventListener('DOMContentLoaded', () => {
+  // Datos pre-cargados por Streamlit (Python los fetcheó server-side)
+  if (typeof PRE_LOADED_RAW !== 'undefined' && PRE_LOADED_RAW) {
+    RAW = PRE_LOADED_RAW;
+    processData();
+    document.getElementById('cfg').style.display  = 'none';
+    document.getElementById('app').style.display  = 'block';
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('main').style.display = 'block';
+    document.getElementById('last-upd').textContent =
+      'Actualizado: ' + new Date().toLocaleString('es-CO');
+    populateSelectors();
+    render();
+    return;
+  }
+  // Auto-conexión normal (GitHub Pages)
   if (DEFAULT_SID) {
-    SID 
+    SID = DEFAULT_SID;
+    startApp();
+    return;
+  }
+  try {
+    const saved = localStorage.getItem('finanzas_sid');
+    if (saved) { document.getElementById('sid').value = saved; }
+  } catch(e) {}
+});
+</script>
+</body>
+</html>
